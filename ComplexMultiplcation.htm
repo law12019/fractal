@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+
+<script>
+
+
+function person(firstname,lastname,age,eyecolor)
+{
+  this.firstname=firstname;
+  this.lastname=lastname;
+  this.age=age;
+  this.eyecolor=eyecolor;
+}
+
+person.prototype.changeName = function (name) {
+  this.lastname=name;
+};
+
+
+
+
+var myFather=new person("John","Doe",50,"blue");
+
+
+
+var r = 1.0;
+var i = 1.5;
+var active = false;
+var dragging = false;
+
+
+function relMouseCoords(event){
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this;
+
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    return {x:canvasX, y:canvasY}
+}
+HTMLCanvasElement.prototype.relMouseCoords = relMouseCoords;
+
+function mouseMove(event)
+{
+  var canvas = document.getElementById("myCanvas")
+  coords = canvas.relMouseCoords(event);
+
+  if (dragging) {
+    r = (coords.x - 200.0) / 100.0;
+    i = (200.0 - coords.y) / 100.0;
+    draw(true);
+  } else {
+    // transform the event to be relative to the canvas.
+      
+    var tx = 200 + r*100.0;
+    var ty = 200 - i*100.0;
+
+    tx = tx - coords.x;
+    ty = ty - coords.y;
+
+    dist = tx * tx + ty * ty;
+    if (dist <= 25.0 && ! active) {
+      active = true;
+      draw(true);
+    }
+    if (dist > 25.0 && active) {
+      active = false;
+      draw(true);
+    }
+  }
+}
+
+function mouseDown(event)
+{
+  if (active) {
+    dragging = true;
+    }
+}
+function mouseUp(event)
+{
+  dragging = false;
+}
+
+
+function draw(dragable)
+{
+  var c=document.getElementById("myCanvas");
+  var canvOK=1;
+  try {c.getContext("2d");}
+  catch (er) {canvOK=0;}
+  if (canvOK==1) {
+
+  
+    var radius = Math.sqrt(r*r + i*i);
+    var theta = Math.atan2(i,r) * 180 / Math.PI;
+    if (theta < 0.0) {
+      theta += 360.0;
+    }
+
+    var ctx=c.getContext("2d");
+    ctx.clearRect ( 0 , 0 , 400 , 410 );
+
+    // Draw the unit circle.
+    ctx.beginPath();
+    ctx.arc(200,200,100,0,2*Math.PI);
+    ctx.strokeStyle="#A0A0A0";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the Axes vector
+    ctx.beginPath();
+    ctx.moveTo(20,200);
+    ctx.lineTo(380,200);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.moveTo(200,20);
+    ctx.lineTo(200,380);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the complex vector
+    ctx.beginPath();
+    ctx.moveTo(200,200);
+    ctx.lineTo(200 + r*100.0,200 - i*100.0);
+    ctx.strokeStyle="#0000AF";
+    ctx.stroke();
+    ctx.closePath();    
+    
+    // Draw the angle theta arc.
+    ctx.beginPath();
+    ctx.strokeStyle="#FF0000";
+    ctx.arc(200,200,20,-theta * Math.PI/ 180.0, 0.0);
+    ctx.stroke();
+    ctx.closePath();
+    
+    
+    if (dragable) {
+      // Active end spot
+      ctx.beginPath();
+      ctx.arc(200 + r*100.0,200 - i*100.0,5,0,2*Math.PI);
+      ctx.closePath();
+      if (active) {
+        ctx.fillStyle="#FFFF00";
+      } else {
+        ctx.fillStyle="#FF0000";
+      }
+      ctx.fill();    
+    } else {
+      // Draw an arrow tip.
+      ctx.beginPath();
+      var tx = 200 + r*100.0;
+      var ty = 200 - i*100.0;
+      // Tip is origin.  end point of barb.
+      var x = -20;
+      var y = +10;
+      // sin and cos from normalized complex vector
+      s = -i/radius; // Rotation is opposite because y is flipped.
+      c = r/radius;
+      // Rotate barb
+      var t1x = tx + x*c - y*s;
+      var t1y = ty + x*s + y*c;
+      var t2x = tx + x*c + y*s;
+      var t2y = ty + x*s - y*c;
+      // draw the barb
+      ctx.beginPath();
+      ctx.moveTo(tx,ty);
+      ctx.lineTo(t1x,t1y);
+      ctx.stroke();
+      ctx.moveTo(tx,ty);
+      ctx.lineTo(t2x,t2y);
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    // Draw the complex coordinates label
+    ctx.font="30px Arial";
+    var coordStr = "";
+    ctx.fillStyle="#0000AF";
+    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + " + ";
+    coordStr = coordStr + i.toFixed(1) + "i";
+    ctx.fillText(coordStr,5,30);
+
+    // Draw the polar coordinates
+    var coordStr = "Radius: ";
+    coordStr = coordStr + radius.toFixed(1);
+    coordStr = coordStr + ", Theta: ";
+    coordStr = coordStr + theta.toFixed(1);
+    ctx.font="20px Arial";
+    ctx.fillStyle="#0000AF";
+    ctx.fillText(coordStr,5,405);
+    }
+}
+
+function main()
+{
+  draw(true);
+}
+</script> 
+
+
+
+
+<body onload="main()">
+
+<canvas id="myCanvas" width="400" height="410" style="border:1px solid #d3d3d3;"
+        onmousemove="mouseMove(event)" 
+        onmousedown="mouseDown()"
+        onmouseup="mouseUp()"
+>
+
+
+
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+</body>
+
+</html>
+
+
+

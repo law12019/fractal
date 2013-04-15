@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+
+<script>
+
+var GRAPH1 = null;
+var GRAPH2 = null;
+
+function ComplexGraph(canvas, origin)
+{
+  this.Color = "#0000ff";
+  this.Origin = origin;
+  this.Scale = 100.0; // Unit
+  this.Canvas = canvas;
+  this.Context = null;
+  this.R=1.0;
+  this.I=0.5;
+  this.Dragable = true;
+  this.Active = false;
+  this.Dragging = false;
+}
+
+
+ComplexGraph.prototype.RelativeMouseCoordinates = function (event) {
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this.Canvas;
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    graphX = canvasX - this.Origin[0];
+    graphY = -(canvasY - this.Origin[1]);
+    
+    return {x:graphX, y:graphY}
+}
+
+
+
+ComplexGraph.prototype.MouseMove = function(event) {
+  coords = this.RelativeMouseCoordinates(event);
+  
+  if (this.Dragging) {
+    // Just move the tip to the mouse.
+    this.R = coords.x / this.Scale;
+    this.I = coords.y / this.Scale;
+    this.Draw();
+  } else {
+    // Haw far is the event away from the tip (in pixels).
+    var tx = this.R*100.0;
+    var ty = this.I*100.0;
+    tx = tx - coords.x;
+    ty = ty - coords.y;
+    // Distance squared
+    dist = tx * tx + ty * ty;
+    if (dist <= 25.0 && ! this.Active) {
+      this.Active = true;
+      this.Draw();
+    }
+    if (dist > 25.0 && this.Active) {
+      this.Active = false;
+      this.Draw();
+    }
+  }
+}
+
+ComplexGraph.prototype.MouseDown = function() {
+  if (this.Active) {
+    this.Dragging = true;
+  }
+}
+
+ComplexGraph.prototype.MouseUp = function() {
+  this.Dragging = false;
+}
+
+
+
+
+ComplexGraph.prototype.Draw = function () {
+  var c=this.Canvas;
+  var r = this.R;
+  var i = this.I;
+  
+  var canvOK=1;
+  try {c.getContext("2d");}
+  catch (er) {canvOK=0;}
+  if (canvOK==1) {
+    this.Radius = Math.sqrt(r*r + i*i);
+    this.Theta = Math.atan2(i,r) * 180 / Math.PI;
+    if (this.Theta < 0.0) {
+      this.Theta += 360.0;
+    }
+
+    var ctx=c.getContext("2d");
+    ctx.clearRect (this.Origin[0]-200 , this.Origin[1]-200, 400 , 410);
+
+    // Draw the unit circle.
+    ctx.beginPath();
+    ctx.arc(this.Origin[0],this.Origin[1],100,0,2*Math.PI);
+    ctx.strokeStyle="#A0A0A0";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the Axes vector
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0]-180,this.Origin[1]);
+    ctx.lineTo(this.Origin[0]+180,this.Origin[1]);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.moveTo(this.Origin[0],this.Origin[1]-180);
+    ctx.lineTo(this.Origin[0],this.Origin[1]+180);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the complex vector
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0],this.Origin[1]);
+    ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+    ctx.strokeStyle=this.Color;
+    ctx.stroke();
+    ctx.closePath();    
+    
+    // Draw the angle theta arc.
+    if (this.Dragable) {
+      ctx.beginPath();
+      ctx.strokeStyle=this.Color;
+      ctx.arc(this.Origin[0],this.Origin[1],20,-this.Theta * Math.PI/ 180.0, 0.0);
+      ctx.stroke();
+      ctx.closePath();
+      }
+    
+    if (this.Dragable) {
+      // Active end spot
+      ctx.beginPath();
+      ctx.arc(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale, 5, 0, 2*Math.PI);
+      ctx.closePath();
+      if (this.Active) {
+        ctx.fillStyle="#FFFF00";
+      } else {
+        ctx.fillStyle=this.Color;
+      }
+      ctx.fill();    
+    } else {
+      // Draw an arrow tip.
+      ctx.beginPath();
+      var tx = this.Origin[0] + r*this.Scale;
+      var ty = this.Origin[1] - i*this.Scale;
+      // Tip is origin.  end point of barb.
+      var x = -15;
+      var y = +8;
+      // sin and cos from normalized complex vector
+      s = -i/this.Radius; // Rotation is opposite because y is flipped.
+      c = r/this.Radius;
+      // Rotate barb
+      var t1x = tx + x*c - y*s;
+      var t1y = ty + x*s + y*c;
+      var t2x = tx + x*c + y*s;
+      var t2y = ty + x*s - y*c;
+      // draw the barb
+      ctx.beginPath();
+      ctx.strokeStyle=this.Color;
+      ctx.moveTo(tx,ty);
+      ctx.lineTo(t1x,t1y);
+      ctx.stroke();
+      ctx.moveTo(tx,ty);
+      ctx.lineTo(t2x,t2y);
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    // Draw the complex coordinates label
+    ctx.font="30px Arial";
+    var coordStr = "";
+    ctx.fillStyle=this.Color;
+    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + " + ";
+    coordStr = coordStr + i.toFixed(1) + "i";
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]-170);
+
+    // Draw the polar coordinates
+    var coordStr = "Radius: ";
+    coordStr = coordStr + this.Radius.toFixed(1);
+    coordStr = coordStr + ", Theta: ";
+    coordStr = coordStr + this.Theta.toFixed(1);
+    ctx.font="20px Arial";
+    ctx.fillStyle=this.Color;
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]+205);
+  }
+}
+
+
+// I should really make draw use this method.
+// For drawing the multiplcation composition.
+ComplexGraph.prototype.DrawVector = function (r,i, color, startTheta, endTheta) {
+  var c=this.Canvas;  
+  var ctx=c.getContext("2d");
+
+  // Draw the complex vector
+  ctx.beginPath();
+  ctx.moveTo(this.Origin[0],this.Origin[1]);
+  ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+  ctx.strokeStyle=color;
+  ctx.stroke();
+  ctx.closePath();    
+  
+  if (this.Dragable) {
+    // Active end spot
+    ctx.beginPath();
+    ctx.arc(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale, 5, 0, 2*Math.PI);
+    ctx.closePath();
+    if (this.Active) {
+      ctx.fillStyle="#FFFF00";
+    } else {
+      ctx.fillStyle=color;
+    }
+    ctx.fill();    
+  } else {
+    // Draw an arrow tip.
+    ctx.beginPath();
+    var tx = this.Origin[0] + r*this.Scale;
+    var ty = this.Origin[1] - i*this.Scale;
+    // Tip is origin.  end point of barb.
+    var x = -15;
+    var y = +8;
+    // sin and cos from normalized complex vector
+    var radius = Math.sqrt(i*i + r*r);
+    s = -i/radius; // Rotation is opposite because y is flipped.
+    c = r/radius;
+    // Rotate barb
+    var t1x = tx + x*c - y*s;
+    var t1y = ty + x*s + y*c;
+    var t2x = tx + x*c + y*s;
+    var t2y = ty + x*s - y*c;
+    // draw the barb
+    ctx.beginPath();
+    ctx.strokeStyle=color;
+    ctx.moveTo(tx,ty);
+    ctx.lineTo(t1x,t1y);
+    ctx.stroke();
+    ctx.moveTo(tx,ty);
+    ctx.lineTo(t2x,t2y);
+    ctx.stroke();
+    ctx.closePath();
+  }
+}
+
+// I should really make draw use this method.
+// For drawing the multiplcation composition.
+ComplexGraph.prototype.DrawArc = function (color, startTheta, endTheta) {
+  var c=this.Canvas;  
+  var ctx=c.getContext("2d");
+
+  // Draw the angle theta arc.
+  ctx.beginPath();
+  ctx.strokeStyle=color;
+  ctx.arc(this.Origin[0],this.Origin[1],20, -endTheta*Math.PI/ 180.0, -startTheta*Math.PI/ 180.0);
+  ctx.stroke();
+  ctx.closePath();
+}
+
+
+
+function updateResult() {
+  x = (GRAPH1.R * GRAPH2.R) - (GRAPH1.I * GRAPH2.I);
+  y = (GRAPH1.R * GRAPH2.I) + (GRAPH1.I * GRAPH2.R);
+
+  GRAPH3.R = x;
+  GRAPH3.I = y;
+}
+
+
+
+function mouseMove(event)
+{
+  if (GRAPH1) GRAPH1.MouseMove(event);
+  if (GRAPH2) GRAPH2.MouseMove(event);
+
+  if (GRAPH1.Dragging || GRAPH2.Dragging) {
+    updateResult();
+    GRAPH3.Draw();
+    GRAPH3.DrawVector(GRAPH1.R,GRAPH1.I, GRAPH1.Color, 0, GRAPH1.Theta);
+    GRAPH3.DrawArc(GRAPH1.Color, 0, GRAPH1.Theta);
+    GRAPH3.DrawArc(GRAPH2.Color, GRAPH1.Theta,  GRAPH1.Theta + GRAPH2.Theta);
+  }
+}
+
+function mouseDown()
+{
+  if (GRAPH1) GRAPH1.MouseDown();
+  if (GRAPH2) GRAPH2.MouseDown();
+}
+
+function mouseUp()
+{
+  if (GRAPH1) GRAPH1.MouseUp();
+  if (GRAPH2) GRAPH2.MouseUp();
+}
+
+
+
+function main()
+{
+  var canvas = document.getElementById("myCanvas")
+  var canvOK=1;
+  try {canvas.getContext("2d");}
+  catch (er) {
+    alert("Could not initialize canvas");
+    return;
+  }
+  var ctx=canvas.getContext("2d");
+
+
+  GRAPH1=new ComplexGraph(canvas, [200, 250]);
+  GRAPH1.Color = "#0000FF"
+  GRAPH2=new ComplexGraph(canvas, [600, 250]);
+  GRAPH2.Color = "#00A000"
+  GRAPH3=new ComplexGraph(canvas, [1000, 250]);
+  GRAPH3.Color = "#000000"
+  GRAPH3.Dragable = false;
+  
+  GRAPH1.Draw();
+  GRAPH2.Draw();
+  updateResult();
+  GRAPH3.Draw();
+  GRAPH3.DrawVector(GRAPH1.R,GRAPH1.I, GRAPH1.Color, 0, GRAPH1.Theta);
+  GRAPH3.DrawArc(GRAPH1.Color, 0, GRAPH1.Theta);
+  GRAPH3.DrawArc(GRAPH2.Color, GRAPH1.Theta,  GRAPH1.Theta + GRAPH2.Theta);
+
+    
+  // Draw titles on the graphs
+  ctx.beginPath();
+  ctx.font="30px Arial";
+  ctx.fillStyle=GRAPH1.Color;
+  ctx.fillText("A", GRAPH1.Origin[0]-10, GRAPH1.Origin[1]-225);
+  ctx.fillStyle=GRAPH2.Color;
+  ctx.fillText("B", GRAPH2.Origin[0]-10, GRAPH2.Origin[1]-225);
+  ctx.fillStyle=GRAPH3.Color;
+  ctx.fillText("A*B", GRAPH3.Origin[0]-20, GRAPH3.Origin[1]-225);    
+  ctx.closePath();
+}
+
+
+</script> 
+
+
+
+
+<body onload="main()">
+
+<canvas id="myCanvas" width="1200" height="470" style="border:1px solid #d3d3d3;"
+        onmousemove="mouseMove(event)" 
+        onmousedown="mouseDown()"
+        onmouseup="mouseUp()"
+/>
+
+
+
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+</body>
+
+</html>
+
+
+

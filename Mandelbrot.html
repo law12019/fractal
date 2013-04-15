@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+
+<script>
+
+var GRAPH1 = null;
+var GRAPH2 = null;
+
+function ComplexGraph(canvas, origin)
+{
+  this.Color = "#0000ff";
+  this.Origin = origin;
+  this.Scale = 100.0; // Unit
+  this.Canvas = canvas;
+  this.Context = null;
+  this.R=1.0;
+  this.I=0.5;
+  this.Dragable = true;
+  this.Active = false;
+  this.Dragging = false;
+}
+
+
+ComplexGraph.prototype.RelativeMouseCoordinates = function (event) {
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this.Canvas;
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    graphX = canvasX - this.Origin[0];
+    graphY = -(canvasY - this.Origin[1]);
+    
+    return {x:graphX, y:graphY}
+}
+
+
+
+ComplexGraph.prototype.MouseMove = function(event) {
+  coords = this.RelativeMouseCoordinates(event);
+  
+  if (this.Dragging) {
+    // Just move the tip to the mouse.
+    this.R = coords.x / this.Scale;
+    this.I = coords.y / this.Scale;
+    this.Draw();
+  } else {
+    // Haw far is the event away from the tip (in pixels).
+    var tx = this.R*100.0;
+    var ty = this.I*100.0;
+    tx = tx - coords.x;
+    ty = ty - coords.y;
+    // Distance squared
+    dist = tx * tx + ty * ty;
+    if (dist <= 25.0 && ! this.Active) {
+      this.Active = true;
+      this.Draw();
+    }
+    if (dist > 25.0 && this.Active) {
+      this.Active = false;
+      this.Draw();
+    }
+  }
+}
+
+ComplexGraph.prototype.MouseDown = function() {
+  if (this.Active) {
+    this.Dragging = true;
+  }
+}
+
+ComplexGraph.prototype.MouseUp = function() {
+  this.Dragging = false;
+}
+
+
+
+
+ComplexGraph.prototype.Draw = function () {
+  var c=this.Canvas;
+  var r = this.R;
+  var i = this.I;
+  
+  var canvOK=1;
+  try {c.getContext("2d");}
+  catch (er) {canvOK=0;}
+  if (canvOK==1) {
+    this.Radius = Math.sqrt(r*r + i*i);
+    this.Theta = Math.atan2(i,r) * 180 / Math.PI;
+    if (this.Theta < 0.0) {
+      this.Theta += 360.0;
+    }
+
+    var ctx=c.getContext("2d");
+    ctx.clearRect (this.Origin[0]-200 , this.Origin[1]-200, 400 , 410);
+
+    if (this.Dragable) {
+      var img=document.getElementById("mandelbrot");
+      ctx.drawImage(img,135,150);
+    }
+    
+    // Draw the unit circle.
+    ctx.beginPath();
+    ctx.arc(this.Origin[0],this.Origin[1],100,0,2*Math.PI);
+    ctx.strokeStyle="#A0A0A0";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the Axes vector
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0]-180,this.Origin[1]);
+    ctx.lineTo(this.Origin[0]+180,this.Origin[1]);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.moveTo(this.Origin[0],this.Origin[1]-180);
+    ctx.lineTo(this.Origin[0],this.Origin[1]+180);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the complex vector
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0],this.Origin[1]);
+    ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+    ctx.strokeStyle=this.Color;
+    ctx.stroke();
+    ctx.closePath();    
+    
+    // Draw the angle theta arc.
+    if (this.Dragable) {
+      ctx.beginPath();
+      ctx.strokeStyle=this.Color;
+      ctx.arc(this.Origin[0],this.Origin[1],20,-this.Theta * Math.PI/ 180.0, 0.0);
+      ctx.stroke();
+      ctx.closePath();
+      }
+    
+    if (this.Dragable) {
+      // Active end spot
+      ctx.beginPath();
+      ctx.arc(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale, 5, 0, 2*Math.PI);
+      ctx.closePath();
+      if (this.Active) {
+        ctx.fillStyle="#FFFF00";
+      } else {
+        ctx.fillStyle=this.Color;
+      }
+      ctx.fill();    
+    } else {
+      // Draw an arrow tip.
+      ctx.beginPath();
+      var tx = this.Origin[0] + r*this.Scale;
+      var ty = this.Origin[1] - i*this.Scale;
+      // Tip is origin.  end point of barb.
+      var x = -15;
+      var y = +8;
+      // sin and cos from normalized complex vector
+      s = -i/this.Radius; // Rotation is opposite because y is flipped.
+      c = r/this.Radius;
+      // Rotate barb
+      var t1x = tx + x*c - y*s;
+      var t1y = ty + x*s + y*c;
+      var t2x = tx + x*c + y*s;
+      var t2y = ty + x*s - y*c;
+      // draw the barb
+      ctx.beginPath();
+      ctx.strokeStyle=this.Color;
+      ctx.moveTo(tx,ty);
+      ctx.lineTo(t1x,t1y);
+      ctx.stroke();
+      ctx.moveTo(tx,ty);
+      ctx.lineTo(t2x,t2y);
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    // Draw the complex coordinates label
+    ctx.font="30px Arial";
+    var coordStr = "";
+    ctx.fillStyle=this.Color;
+    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + " + ";
+    coordStr = coordStr + i.toFixed(1) + "i";
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]-170);
+
+    // Draw the polar coordinates
+    var coordStr = "Radius: ";
+    coordStr = coordStr + this.Radius.toFixed(1);
+    coordStr = coordStr + ", Theta: ";
+    coordStr = coordStr + this.Theta.toFixed(1);
+    ctx.font="20px Arial";
+    ctx.fillStyle=this.Color;
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]+205);
+  }
+}
+
+
+// I should really make draw use this method.
+// For drawing the multiplcation composition.
+ComplexGraph.prototype.DrawVector = function (r,i, color) {
+  var c=this.Canvas;  
+  var ctx=c.getContext("2d");
+
+  // Draw the complex vector
+  ctx.beginPath();
+  ctx.moveTo(this.Origin[0],this.Origin[1]);
+  ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+  ctx.strokeStyle=color;
+  ctx.stroke();
+  ctx.closePath();    
+  
+  if (this.Dragable) {
+    // Active end spot
+    ctx.beginPath();
+    ctx.arc(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale, 5, 0, 2*Math.PI);
+    ctx.closePath();
+    if (this.Active) {
+      ctx.fillStyle="#FFFF00";
+    } else {
+      ctx.fillStyle=color;
+    }
+    ctx.fill();    
+  } else {
+    // Draw an arrow tip.
+    ctx.beginPath();
+    var tx = this.Origin[0] + r*this.Scale;
+    var ty = this.Origin[1] - i*this.Scale;
+    // Tip is origin.  end point of barb.
+    var x = -15;
+    var y = +8;
+    // sin and cos from normalized complex vector
+    var radius = Math.sqrt(i*i + r*r);
+    s = -i/radius; // Rotation is opposite because y is flipped.
+    c = r/radius;
+    // Rotate barb
+    var t1x = tx + x*c - y*s;
+    var t1y = ty + x*s + y*c;
+    var t2x = tx + x*c + y*s;
+    var t2y = ty + x*s - y*c;
+    // draw the barb
+    ctx.beginPath();
+    ctx.strokeStyle=color;
+    ctx.moveTo(tx,ty);
+    ctx.lineTo(t1x,t1y);
+    ctx.stroke();
+    ctx.moveTo(tx,ty);
+    ctx.lineTo(t2x,t2y);
+    ctx.stroke();
+    ctx.closePath();
+  }
+}
+
+// I should really make draw use this method.
+// For drawing the multiplcation composition.
+ComplexGraph.prototype.DrawArc = function (color, startTheta, endTheta) {
+  var c=this.Canvas;  
+  var ctx=c.getContext("2d");
+
+  // Draw the angle theta arc.
+  ctx.beginPath();
+  ctx.strokeStyle=color;
+  ctx.arc(this.Origin[0],this.Origin[1],20, -endTheta*Math.PI/ 180.0, -startTheta*Math.PI/ 180.0);
+  ctx.stroke();
+  ctx.closePath();
+}
+
+
+var RUN = false;
+var RADIUS = 0.0;
+var COUNT = 0;
+var X = 0.0;
+var Y = 0.0;
+
+function run() {
+  GRAPH2.R = X = 0.0;
+  GRAPH2.I = Y = 0.0;
+  GRAPH2.Draw();
+  RADIUS = 0;
+  COUNT = 0;
+  RUN = true;
+  iterate();
+} 
+
+function iterate() {
+  if ( ! RUN) { return }
+  ++COUNT;
+  X = (X * X) - (Y * Y);
+  Y = (X * Y) + (Y * X);
+  //GRAPH2.R = X;
+  //GRAPH2.I = Y;
+  //GRAPH2.Draw();
+  X += GRAPH1.R;
+  Y += GRAPH1.I;
+  GRAPH2.R = X;
+  GRAPH2.I = Y;
+
+  RADIUS = Math.sqrt(X*X + Y*Y);
+
+  if (RADIUS > 2.0) {
+    GRAPH2.Color = "#FF0000";
+  }  
+  GRAPH2.Draw();
+  GRAPH2.Color = "#000000";
+
+  var ctx=GRAPH1.Canvas.getContext("2d");
+  ctx.font="30px Arial";
+  var str = "";
+  str += COUNT;
+  
+  
+  ctx.beginPath();
+  ctx.font="30px Arial";
+  ctx.fillStyle="#000000";
+  ctx.fillText(str, 850, 240);
+  ctx.closePath();  
+  
+  
+  if (RADIUS > 2.0) { 
+    RUN = false;
+  } else {
+    setTimeout(function(){iterate()},1000);
+  }
+}
+
+
+
+function stop() {
+  RUN = false;
+}
+
+
+function mouseMove(event)
+{
+  if (GRAPH1.Dragging) { RUN = false; }
+  if (GRAPH1) GRAPH1.MouseMove(event);
+}
+
+function mouseDown()
+{
+  if (GRAPH1) GRAPH1.MouseDown();
+}
+
+function mouseUp()
+{
+  if (GRAPH1) GRAPH1.MouseUp();
+}
+
+
+
+function main()
+{
+  var canvas = document.getElementById("myCanvas")
+  var canvOK=1;
+  try {canvas.getContext("2d");}
+  catch (er) {
+    alert("Could not initialize canvas");
+    return;
+  }
+  var ctx=canvas.getContext("2d");
+
+
+  GRAPH1=new ComplexGraph(canvas, [300, 250]);
+  GRAPH1.Color = "#0000FF"
+  GRAPH2=new ComplexGraph(canvas, [700, 250]);
+  GRAPH2.Color = "#00A000"
+  GRAPH2.R = 0.0;
+  GRAPH2.I = 0.0;
+  GRAPH2.Dragable = false;
+  
+  GRAPH1.Draw();
+  GRAPH2.Draw();
+
+    
+  // Draw titles on the graphs
+  ctx.beginPath();
+  ctx.font="30px Arial";
+  ctx.fillStyle=GRAPH1.Color;
+  ctx.fillText("C", GRAPH1.Origin[0]-10, GRAPH1.Origin[1]-225);
+  ctx.fillStyle=GRAPH2.Color;
+  ctx.fillText("Z = Z*Z + C", GRAPH2.Origin[0]-90, GRAPH2.Origin[1]-225);
+  ctx.closePath();
+}
+
+
+</script> 
+
+
+
+
+<body onload="main()">
+
+
+<img id="mandelbrot" src="mandelbrot3.jpg" width="254" height="200" hidden="true">
+
+
+<canvas id="myCanvas" width="900" height="470" style="border:1px solid #d3d3d3;"
+        onmousemove="mouseMove(event)" 
+        onmousedown="mouseDown()"
+        onmouseup="mouseUp()"
+>
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+</br>
+
+<button type="button" onclick="run()">Go!</button>
+<button type="button" onclick="stop()">Stop</button>
+
+</br>
+<a href="http://www.youtube.com/watch?v=RYVmd7H7gzw">Fast Zoom Video</a>
+
+</br>
+<a href="http://www.youtube.com/watch?v=9G6uO7ZHtK8">Slow Zoom Video</a>
+
+</br>
+<a href="http://www.youtube.com/watch?v=VSDI84Mm-hI">Scale of the Universe</a>
+
+
+
+</body>
+
+</html>
+
+
+

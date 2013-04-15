@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+
+<script>
+
+var GRAPH1 = null;
+var GRAPH2 = null;
+
+function ComplexGraph(canvas, origin)
+{
+  this.Color = "#0000ff";
+  this.Origin = origin;
+  this.Scale = 100.0; // Unit
+  this.Canvas = canvas;
+  this.Context = null;
+  this.R=1.0;
+  this.I=0.5;
+  this.Dragable = true;
+  this.Active = false;
+  this.Dragging = false;
+}
+
+
+ComplexGraph.prototype.RelativeMouseCoordinates = function (event) {
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this.Canvas;
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    graphX = canvasX - this.Origin[0];
+    graphY = -(canvasY - this.Origin[1]);
+    
+    return {x:graphX, y:graphY}
+}
+
+
+
+ComplexGraph.prototype.MouseMove = function(event) {
+  coords = this.RelativeMouseCoordinates(event);
+  
+  if (this.Dragging) {
+    // Just move the tip to the mouse.
+    this.R = coords.x / this.Scale;
+    this.I = coords.y / this.Scale;
+    draw();
+  } else {
+    // Haw far is the event away from the tip (in pixels).
+    var tx = this.R*100.0;
+    var ty = this.I*100.0;
+    tx = tx - coords.x;
+    ty = ty - coords.y;
+    // Distance squared
+    dist = tx * tx + ty * ty;
+    if (dist <= 25.0 && ! this.Active) {
+      this.Active = true;
+      this.Draw(true);
+    }
+    if (dist > 25.0 && this.Active) {
+      this.Active = false;
+      this.Draw(true);
+    }
+  }
+}
+
+ComplexGraph.prototype.MouseDown = function() {
+  if (this.Active) {
+    this.Dragging = true;
+  }
+}
+
+ComplexGraph.prototype.MouseUp = function() {
+  this.Dragging = false;
+}
+
+
+ComplexGraph.prototype.Draw = function (vectorFlag) {
+  var c=this.Canvas;
+  var r = this.R;
+  var i = this.I;
+  
+  var canvOK=1;
+  try {c.getContext("2d");}
+  catch (er) {canvOK=0;}
+  if (canvOK==1) {
+    this.Radius = Math.sqrt(r*r + i*i);
+    this.Theta = Math.atan2(i,r) * 180 / Math.PI;
+    if (this.Theta < 0.0) {
+      this.Theta += 360.0;
+    }
+
+    var ctx=c.getContext("2d");
+    //ctx.clearRect (this.Origin[0]-200 , this.Origin[1]-200, 400 , 410);
+
+    if (this.Dragable) {
+      var img=document.getElementById("mandelbrot");
+      ctx.drawImage(img,139,150);
+    }
+    
+    // Draw the unit circle.
+    ctx.beginPath();
+    ctx.arc(this.Origin[0],this.Origin[1],100,0,2*Math.PI);
+    ctx.strokeStyle="#A0A0A0";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the Axes vector
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0]-180,this.Origin[1]);
+    ctx.lineTo(this.Origin[0]+180,this.Origin[1]);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.moveTo(this.Origin[0],this.Origin[1]-180);
+    ctx.lineTo(this.Origin[0],this.Origin[1]+180);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.closePath();
+
+    if (vectorFlag) {
+      this.DrawVectorTriangle([r,i], this.Color, [1,0], false);
+    }
+    
+    // Draw the complex coordinates label
+    ctx.font="30px Arial";
+    var coordStr = "";
+    ctx.fillStyle=this.Color;
+    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + " + ";
+    coordStr = coordStr + i.toFixed(1) + "i";
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]-170);
+
+    // Draw the polar coordinates
+    var coordStr = "Angle: ";
+    coordStr = coordStr + this.Theta.toFixed(1);
+    coordStr = coordStr + ", Magnitude: ";
+    coordStr = coordStr + this.Radius.toFixed(1);
+    ctx.font="20px Arial";
+    ctx.fillStyle=this.Color;
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]+205);
+
+    // Pick a rainbow color for the count label
+    if (COUNT > 0) {
+      ctx.font="30px Arial";
+      var str = "";
+      str += COUNT;
+      ctx.beginPath();
+      ctx.font="50px Arial";
+      // Use the count to compute a cycling rainbow color.
+      var hue = (COUNT % 30) / 10.0;
+      // blue 0-1-2
+      var b = hue;
+      if (b > 1.0) { b = 2.0-b;}
+      if (b < 0.0) { b = 0.0;}
+      // Red 1-2-3
+      var r = hue - 1.0;
+      if (r > 1.0) { r = 2.0-r;}
+      if (r < 0.0) { r = 0.0;}
+      // green 2-3/0-1
+      var g = hue - 2.0;
+      if (g < -1.0) { g += 3.0; } // Wrap
+      if (g > 1.0) { g = 2.0-g;}
+      if (g < 0.0) { g = 0.0;}
+      // Softer curve for brighter colors.
+      r = Math.sin(r * Math.PI * 0.5) * 255;
+      b = Math.sin(b * Math.PI * 0.5) * 255;
+      g = Math.sin(g * Math.PI * 0.5) * 255;
+      // Now change this into a color.
+      color = "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
+      ctx.fillStyle= color;
+      ctx.fillText(str, 840, 240);
+      ctx.closePath();  
+    }
+  }
+}
+
+
+
+
+
+
+
+// For drawing the multiplcation composition.
+// Base is for the multiplication demonstration.
+// Transformation so [1,0] moves onto base.
+// triFlag draws the base to tip line
+ComplexGraph.prototype.DrawVectorTriangle = function (vect, color, base, triFlag) {
+  var ctx=this.Canvas.getContext("2d");
+
+  var thetaBase = Math.atan2(base[1], base[0]);
+  var thetaVect = Math.atan2(vect[1], vect[0]);
+  
+  // Rotate the vector to match the base
+  var r = vect[0]*base[0] - vect[1]*base[1];
+  var i = vect[0]*base[1] + vect[1]*base[0];
+  
+  // Draw the complex vector
+  ctx.beginPath();
+  ctx.moveTo(this.Origin[0], this.Origin[1]);
+  ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+  ctx.strokeStyle=color;
+  ctx.stroke();
+  ctx.closePath();    
+
+  if (triFlag) {
+    // Close the triangle to (1,0) to better demonstrate muliptlication of magnitude.
+    // I would like to make this line dashed.
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0] + base[0]*this.Scale, this.Origin[1] - base[1]*this.Scale);
+    ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+    ctx.strokeStyle=color;
+    ctx.stroke();
+    ctx.closePath();    
+  }
+    
+  // Draw the arc
+  // Funky negatives because canvas y axis is flipped.
+  ctx.beginPath();
+  ctx.strokeStyle=color;
+  ctx.lineWidth = 5;
+  ctx.arc(this.Origin[0],this.Origin[1],10,-thetaVect-thetaBase, -thetaBase);
+  ctx.stroke();
+  ctx.closePath();
+  ctx.lineWidth = 1;
+  
+  // Active end spot
+  var spotRadius = 3;
+  if (this.Dragable) {
+    var spotRadius = 6;
+  }
+  ctx.beginPath();
+  ctx.arc(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale, spotRadius, 0, 2*Math.PI);
+  if (this.Dragable) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle="#FFFF00";
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+  ctx.closePath();
+  if (this.Active) {
+    ctx.fillStyle="#FFFF00";
+  } else {
+    ctx.fillStyle=this.Color;
+  }
+  ctx.fill();    
+}
+
+
+
+var RUN = false;
+var COUNT = 0;
+var ITERATION = 0;
+// Need these for the steps of the animation.
+var Z = [0.0, 0.0];
+var Z_SQUARED = [0.0, 0.0];
+var Z_MAGNITUDE2 = 0.0;
+
+function run() {
+  GRAPH2.R = GRAPH1.R;
+  GRAPH2.I = GRAPH1.I;
+  draw();
+  RADIUS = 0;
+  COUNT = 1;
+  RUN = true;
+  iterate1();
+} 
+
+// Just draw Z.
+function iterate1() {
+  if ( ! RUN) { return }
+  var ctx=GRAPH1.Canvas.getContext("2d");
+
+  ITERATION = 1;
+  Z = [GRAPH2.R, GRAPH2.I];
+  Z_MAGNITUDE2 = GRAPH2.R*GRAPH2.R + GRAPH2.I*GRAPH2.I;
+  var r = Z[0]*Z[0] - Z[1]*Z[1];
+  var i = Z[0]*Z[1] + Z[1]*Z[0];
+  Z_SQUARED = [r,i];
+  draw();
+
+  if (Z_MAGNITUDE2 > 4.0) { 
+    RUN = false;
+  } else {
+    setTimeout(function(){iterate2()},1000);
+  }  
+}
+
+// Animate the squaring of z.
+function iterate2() {
+  ITERATION = 2;
+  draw();
+  setTimeout(function(){iterate3()},500);
+}
+
+
+// Animate the squaring of z.
+function iterate3() {
+  GRAPH2.R = Z_SQUARED[0];
+  GRAPH2.I = Z_SQUARED[1];
+
+  ITERATION = 3;
+  draw();
+  setTimeout(function(){iterate4()},500);
+}
+
+
+
+
+// Animate the shift (addition of the constant).
+function iterate4() {
+  var r = GRAPH2.R;
+  var i = GRAPH2.I;
+
+  // Add the constant C
+  GRAPH2.R += GRAPH1.R;
+  GRAPH2.I += GRAPH1.I;
+
+  ITERATION = 4;
+  draw();
+  ++COUNT;
+    
+  setTimeout(function(){iterate1()},1000);
+}
+
+
+function stop() {
+  RUN = false;
+}
+
+
+function mouseMove(event)
+{
+  if (GRAPH1.Dragging) { RUN = false; }
+  if (GRAPH1) GRAPH1.MouseMove(event);
+}
+
+function mouseDown()
+{
+  if (GRAPH1) GRAPH1.MouseDown();
+}
+
+function mouseUp()
+{
+  if (GRAPH1) GRAPH1.MouseUp();
+}
+
+function draw()
+{
+  var ctx=GRAPH1.Canvas.getContext("2d");
+  ctx.clearRect(0 , 0, 900 , 470);
+    
+  // Draw titles on the graphs
+  ctx.beginPath();
+  ctx.font="30px Arial";
+  ctx.fillStyle=GRAPH1.Color;
+  ctx.fillText("C", GRAPH1.Origin[0]-10, GRAPH1.Origin[1]-225);
+  ctx.closePath();
+
+  // Highlight the part of the equation currently being graphed.
+  ctx.beginPath();
+  ctx.fillStyle=GRAPH2.Color;
+  ctx.fillText("=", GRAPH2.Origin[0]-65, GRAPH2.Origin[1]-225);
+  ctx.fillText("+", GRAPH2.Origin[0]+15, GRAPH2.Origin[1]-225);
+  ctx.closePath();
+
+  ctx.beginPath();
+  if (ITERATION == 1) {
+    ctx.fillStyle="#B00000";
+  } else {
+    ctx.fillStyle=GRAPH2.Color;
+  }
+  ctx.fillText("Z", GRAPH2.Origin[0]-90, GRAPH2.Origin[1]-225);
+  ctx.closePath();
+
+  ctx.beginPath();
+  if (ITERATION == 2 || ITERATION == 3) {
+    ctx.fillStyle="#B00000";
+  } else {
+    ctx.fillStyle=GRAPH2.Color;
+  }
+  ctx.fillText("Z*Z", GRAPH2.Origin[0]-40, GRAPH2.Origin[1]-225);
+  ctx.closePath();
+
+  ctx.beginPath();
+  if (ITERATION == 4) {
+    ctx.fillStyle="#B00000";
+  } else {
+    ctx.fillStyle=GRAPH2.Color;
+  }
+  ctx.fillText("C", GRAPH2.Origin[0] + 40, GRAPH2.Origin[1]-225);
+  ctx.closePath();
+
+  
+  GRAPH1.Draw(true);
+
+  // Draw the termination circle.
+  ctx.beginPath();
+  if (Z_MAGNITUDE2 > 4) {
+    ctx.strokeStyle="#FF0000";
+  } else {
+    ctx.strokeStyle="#FFE0E0";
+  }
+  ctx.arc(GRAPH2.Origin[0],GRAPH2.Origin[1],200,0, 2.0*Math.PI);
+  ctx.stroke();
+  ctx.closePath();  
+
+  // How we draw GRAPH2 depends on the iteration.
+  if (ITERATION <= 1) {
+    if (Z_MAGNITUDE2 > 4) {
+      GRAPH2.Color = "#FF0000";
+    } else {
+      GRAPH2.Color = "#00A000"
+    }
+    GRAPH2.Draw(true);
+    return;
+  }
+  
+  GRAPH2.Draw(false);
+  GRAPH2.DrawVectorTriangle(Z, GRAPH2.Color, [1,0], true);
+
+  if (ITERATION > 2) {
+    GRAPH2.DrawVectorTriangle(Z, GRAPH2.Color, Z, true);
+  }
+  if (ITERATION > 3) {
+    ctx.beginPath();
+    r = Z_SQUARED[0];
+    i = Z_SQUARED[1];
+    ctx.moveTo(GRAPH2.Origin[0] + r*GRAPH2.Scale, GRAPH2.Origin[1] - i*GRAPH2.Scale);
+    r = GRAPH2.R;
+    i = GRAPH2.I;  
+    ctx.lineTo(GRAPH2.Origin[0] + r*GRAPH2.Scale, GRAPH2.Origin[1] - i*GRAPH2.Scale);
+    ctx.strokeStyle=GRAPH1.Color;
+    ctx.stroke();
+    ctx.closePath();    
+  }
+}
+
+function main()
+{
+  var canvas = document.getElementById("myCanvas")
+  var canvOK=1;
+  try {canvas.getContext("2d");}
+  catch (er) {
+    alert("Could not initialize canvas");
+    return;
+  }
+  var ctx=canvas.getContext("2d");
+
+
+  GRAPH1=new ComplexGraph(canvas, [300, 250]);
+  GRAPH1.Color = "#0000FF"
+  GRAPH2=new ComplexGraph(canvas, [700, 250]);
+  GRAPH2.Color = "#00A000"
+  GRAPH2.R = 0.0;
+  GRAPH2.I = 0.0;
+  GRAPH2.Dragable = false;
+  
+  draw();
+}
+
+
+</script> 
+
+
+
+
+<body onload="main()">
+
+
+<img id="mandelbrot" src="mandelbrot3.jpg" width="254" height="200" hidden="true">
+
+
+<canvas id="myCanvas" width="900" height="470" style="border:1px solid #d3d3d3;"
+        onmousemove="mouseMove(event)" 
+        onmousedown="mouseDown()"
+        onmouseup="mouseUp()"
+>
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+</br>
+
+<button type="button" onclick="run()">Go!</button>
+<button type="button" onclick="stop()">Stop</button>
+
+</br>
+We use simple complex arithmatic to create a chaotic sequence and fractal function.
+
+</br>
+Next: Videos
+</br>
+<a href="http://www.youtube.com/watch?v=RYVmd7H7gzw">Fast Zoom Video</a>
+</br>
+<a href="http://www.youtube.com/watch?v=9G6uO7ZHtK8">Slow Zoom Video</a>
+</br>
+<a href="http://www.youtube.com/watch?v=VSDI84Mm-hI">Scale of the Universe</a>
+
+
+
+</body>
+
+</html>
+
+
+

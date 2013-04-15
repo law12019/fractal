@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+
+<script>
+
+var GRAPH1 = null;
+var GRAPH2 = null;
+
+function ComplexGraph(canvas, origin)
+{
+  this.Color = "#0000ff";
+  this.Origin = origin;
+  this.Scale = 100.0; // Unit
+  this.Canvas = canvas;
+  this.Context = null;
+  this.R=1.0;
+  this.I=0.5;
+  this.Dragable = true;
+  this.Active = false;
+  this.Dragging = false;
+}
+
+
+ComplexGraph.prototype.RelativeMouseCoordinates = function (event) {
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this.Canvas;
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    graphX = canvasX - this.Origin[0];
+    graphY = -(canvasY - this.Origin[1]);
+    
+    return {x:graphX, y:graphY}
+}
+
+
+
+ComplexGraph.prototype.MouseMove = function(event) {
+  coords = this.RelativeMouseCoordinates(event);
+  
+  if (this.Dragging) {
+    // Just move the tip to the mouse.
+    this.R = coords.x / this.Scale;
+    this.I = coords.y / this.Scale;
+    draw();
+  } else {
+    // How far is the event away from the tip (in pixels).
+    var tx = this.R*100.0;
+    var ty = this.I*100.0;
+    tx = tx - coords.x;
+    ty = ty - coords.y;
+    // Distance squared
+    dist = tx * tx + ty * ty;
+    if (dist <= 25.0 && ! this.Active) {
+      this.Active = true;
+      this.Draw(true);
+    }
+    if (dist > 25.0 && this.Active) {
+      this.Active = false;
+      this.Draw(true);
+    }
+  }
+}
+
+ComplexGraph.prototype.MouseDown = function() {
+  if (this.Active) {
+    this.Dragging = true;
+  }
+}
+
+ComplexGraph.prototype.MouseUp = function() {
+  this.Dragging = false;
+}
+
+
+
+
+ComplexGraph.prototype.Draw = function (vectorFlag) {
+  var c=this.Canvas;
+  var r = this.R;
+  var i = this.I;
+  
+  var canvOK=1;
+  try {c.getContext("2d");}
+  catch (er) {canvOK=0;}
+  if (canvOK==1) {
+    this.Radius = Math.sqrt(r*r + i*i);
+    this.Theta = Math.atan2(i,r) * 180 / Math.PI;
+    if (this.Theta < 0.0) {
+      this.Theta += 360.0;
+    }
+
+    var ctx=c.getContext("2d");
+
+    // Draw the unit circle.
+    ctx.beginPath();
+    ctx.arc(this.Origin[0],this.Origin[1],100,0,2*Math.PI);
+    ctx.strokeStyle="#A0A0A0";
+    ctx.stroke();
+    ctx.closePath();
+
+    // Draw the Axes vector
+    ctx.beginPath();
+    ctx.moveTo(this.Origin[0]-180,this.Origin[1]);
+    ctx.lineTo(this.Origin[0]+180,this.Origin[1]);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.moveTo(this.Origin[0],this.Origin[1]-180);
+    ctx.lineTo(this.Origin[0],this.Origin[1]+180);
+    ctx.strokeStyle="#000000";
+    ctx.stroke();
+    ctx.closePath();
+
+    if (vectorFlag) {
+      this.DrawVectorTriangle([r,i], this.Theta, this.Color, [1.0,0.0]);
+    }
+    
+    // Draw the complex coordinates label
+    ctx.font="30px Arial";
+    var coordStr = "";
+    ctx.fillStyle=this.Color;
+    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + " + ";
+    coordStr = coordStr + i.toFixed(1) + "i";
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]-170);
+
+    // Draw the polar coordinates
+    var coordStr = "Angle: ";
+    coordStr = coordStr + this.Theta.toFixed(1);
+    coordStr = coordStr + ", Magnitude: ";
+    coordStr = coordStr + this.Radius.toFixed(1);
+    ctx.font="20px Arial";
+    ctx.fillStyle=this.Color;
+    ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]+205);
+  }
+}
+
+
+
+// For drawing the multiplcation composition.
+// Base is for the multiplication demonstration.
+// Transformation so [1,0] moves onto base.
+ComplexGraph.prototype.DrawVectorTriangle = function (vect, theta, color, base) {
+  var ctx=this.Canvas.getContext("2d");
+
+  // Rotate the vector to match the base
+  var r = vect[0]*base[0] - vect[1]*base[1];
+  var i = vect[0]*base[1] + vect[1]*base[0];
+  
+  // Draw the complex vector
+  ctx.beginPath();
+  ctx.moveTo(this.Origin[0], this.Origin[1]);
+  ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+  ctx.strokeStyle=color;
+  ctx.stroke();
+  ctx.closePath();    
+
+  // Close the triangle to (1,0) to better demonstrate muliptlication of magnitude.
+  // I would like to make this line dashed.
+  ctx.beginPath();
+  ctx.moveTo(this.Origin[0] + base[0]*this.Scale, this.Origin[1] - base[1]*this.Scale);
+  ctx.lineTo(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale);
+  ctx.strokeStyle=color;
+  ctx.stroke();
+  ctx.closePath();    
+
+  // Draw the arc
+  // Funky negatives because canvas y axis is flipped.
+  startThetaRad = Math.atan2(base[1],base[0]);
+  ctx.beginPath();
+  ctx.strokeStyle=color;
+  ctx.lineWidth = 5;
+  ctx.arc(this.Origin[0],this.Origin[1],20,-theta * Math.PI/ 180.0 - startThetaRad, -startThetaRad);
+  ctx.stroke();
+  ctx.closePath();
+  ctx.lineWidth = 1;
+  
+  // Active end spot
+  var spotRadius = 3;
+  if (this.Dragable) {
+    var spotRadius = 6;
+  }
+  ctx.beginPath();
+  ctx.arc(this.Origin[0] + r*this.Scale, this.Origin[1] - i*this.Scale, spotRadius, 0, 2*Math.PI);
+  ctx.closePath();
+  if (this.Active) {
+    ctx.fillStyle="#FFFF00";
+  } else {
+    ctx.fillStyle=this.Color;
+  }
+  ctx.fill();    
+}
+
+
+function mouseMove(event)
+{
+  if (GRAPH1) GRAPH1.MouseMove(event);
+  if (GRAPH2) GRAPH2.MouseMove(event);
+
+  if (GRAPH1.Dragging || GRAPH2.Dragging) {
+    draw();
+  }
+}
+
+function mouseDown()
+{
+  if (GRAPH1) GRAPH1.MouseDown();
+  if (GRAPH2) GRAPH2.MouseDown();
+}
+
+function mouseUp()
+{
+  if (GRAPH1) GRAPH1.MouseUp();
+  if (GRAPH2) GRAPH2.MouseUp();
+}
+
+
+function draw() {
+  var ctx=GRAPH1.Canvas.getContext("2d");
+  ctx.clearRect(0, 0, 1200, 470);
+
+  GRAPH3.R = GRAPH1.R*GRAPH2.R - GRAPH1.I*GRAPH2.I;
+  GRAPH3.I = GRAPH1.R*GRAPH2.I + GRAPH1.I*GRAPH2.R;
+  
+  GRAPH1.Draw(true);
+  GRAPH2.Draw(true);
+  GRAPH3.Draw(false);
+  GRAPH3.DrawVectorTriangle([GRAPH2.R,GRAPH2.I],GRAPH2.Theta, GRAPH2.Color, [1.0,0.0]);
+  GRAPH3.DrawVectorTriangle([GRAPH1.R,GRAPH1.I],GRAPH1.Theta, GRAPH1.Color, [GRAPH2.R,GRAPH2.I]);
+      
+  // Draw titles on the graphs
+  ctx.beginPath();
+  ctx.font="30px Arial";
+  ctx.fillStyle=GRAPH1.Color;
+  ctx.fillText("A", GRAPH1.Origin[0]-10, GRAPH1.Origin[1]-225);
+  ctx.fillStyle=GRAPH2.Color;
+  ctx.fillText("B", GRAPH2.Origin[0]-10, GRAPH2.Origin[1]-225);
+  ctx.fillStyle=GRAPH3.Color;
+  ctx.fillText("A*B", GRAPH3.Origin[0]-20, GRAPH3.Origin[1]-225);    
+  ctx.closePath();  
+}
+
+
+function main()
+{
+  var canvas = document.getElementById("myCanvas")
+  var canvOK=1;
+  try {canvas.getContext("2d");}
+  catch (er) {
+    alert("Could not initialize canvas");
+    return;
+  }
+  var ctx=canvas.getContext("2d");
+
+
+  GRAPH1=new ComplexGraph(canvas, [200, 250]);
+  GRAPH1.Color = "#0000FF"
+  GRAPH2=new ComplexGraph(canvas, [600, 250]);
+  GRAPH2.Color = "#00A000"
+  GRAPH3=new ComplexGraph(canvas, [1000, 250]);
+  GRAPH3.Color = "#000000"
+  GRAPH3.Dragable = false;
+  
+  draw();
+}
+
+
+</script> 
+
+
+
+
+<body onload="main()">
+
+<canvas id="myCanvas" width="1200" height="470" style="border:1px solid #d3d3d3;"
+        onmousemove="mouseMove(event)" 
+        onmousedown="mouseDown()"
+        onmouseup="mouseUp()"
+>
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+</br>
+Complex numbers can be specified in polar coordinates as an angle and magnitude.
+</br>
+Mulipication of complex numbers adds the angles and scales the magnitudeS.
+</br>
+Next: <a href="mandelbrot2.htm">Mandelbrot set</a>
+
+
+</body>
+
+</html>
+
+
+
