@@ -131,16 +131,16 @@ ComplexGraph.prototype.Draw = function (vectorFlag) {
     ctx.font="30px Arial";
     var coordStr = "";
     ctx.fillStyle=this.Color;
-    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + r.toFixed(2);
     coordStr = coordStr + " + ";
-    coordStr = coordStr + i.toFixed(1) + "i";
+    coordStr = coordStr + i.toFixed(2) + "i";
     ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]-170);
 
     // Draw the polar coordinates
     var coordStr = "Angle: ";
     coordStr = coordStr + this.Theta.toFixed(1);
     coordStr = coordStr + ", Magnitude: ";
-    coordStr = coordStr + this.Radius.toFixed(1);
+    coordStr = coordStr + this.Radius.toFixed(2);
     ctx.font="20px Arial";
     ctx.fillStyle=this.Color;
     ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]+205);

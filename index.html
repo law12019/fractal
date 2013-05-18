@@ -127,9 +127,9 @@ ComplexGraph.prototype.Draw = function (vectorFlag) {
     ctx.font="30px Arial";
     var coordStr = "";
     ctx.fillStyle=this.Color;
-    coordStr = coordStr + r.toFixed(1);
+    coordStr = coordStr + r.toFixed(2);
     coordStr = coordStr + " + ";
-    coordStr = coordStr + i.toFixed(1) + "i";
+    coordStr = coordStr + i.toFixed(2) + "i";
     ctx.fillText(coordStr, this.Origin[0]-195, this.Origin[1]-170);
   }
 }
